@@ -1,61 +1,71 @@
-use crate::app_error::AppError;
+use crate::{constants, error::Error, utils};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::path::PathBuf;
+use std::{env, fs};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
-  #[serde(rename = "encryptionKey")]
-  pub encryption_key: String,
-
-  #[serde(rename = "fictionDir")]
-  pub fiction_dir: Option<String>,
+  pub fiction_dir: String,
 }
 
 lazy_static! {
   static ref CONFIG: Option<Config> = load_config();
 }
 
-pub fn get_config() -> Result<Config, AppError> {
-  return match CONFIG.clone() {
+pub fn get_config() -> Result<Config, Error> {
+  match CONFIG.clone() {
     Some(config) => Ok(config),
-    None => Err(AppError::new("Not a shadow repository or any of the parent directories")),
-  };
+    None => Err(Error::new("Not a shadow repository or any of the parent directories")),
+  }
 }
 
 pub fn get_config_or_exit() -> Config {
-  let config = get_config();
-
-  return match config {
+  match get_config() {
     Ok(config) => config,
     Err(error) => error.print_and_exit(),
-  };
+  }
 }
 
-pub fn save_config(config: &Config) -> Result<(), AppError> {
-  let config = serde_json::to_string_pretty(config);
-  if config.is_err() {
-    return Err(AppError::new("Failed to serialize the config"));
-  }
+pub fn save_config(config: &Config) {
+  let config_buffer = match rmp_serde::to_vec(config) {
+    Ok(buffer) => buffer,
+    Err(_) => Error::new("Failed to serialize the config").print_and_exit(),
+  };
 
-  let contents = config.unwrap();
-  let result = fs::write("shadow.config.json", contents);
-  if result.is_err() {
-    return Err(AppError::new("Failed to write the config file"));
-  }
-
-  return Ok(());
+  let config_file_path = format!("{}/config", crate::constants::CONFIG_DIR);
+  utils::save_to_file(&config_file_path, &config_buffer);
 }
 
 fn load_config() -> Option<Config> {
-  let config = fs::read_to_string("shadow.config.json");
-  if config.is_err() {
-    return None;
-  }
+  let mut dir = match env::current_dir() {
+    Ok(dir) => dir,
+    Err(_) => Error::new("Failed to get the current directory").print_and_exit(),
+  };
 
-  let config = config.unwrap();
-  return match serde_json::from_str(&config) {
+  loop {
+    let mut file_path = dir.clone();
+    file_path.push(constants::CONFIG_DIR);
+    file_path.push(constants::CONFIG_FILE);
+
+    if file_path.is_file() {
+      return get_config_from_file(&file_path);
+    }
+
+    let has_parent = dir.pop();
+    if !has_parent {
+      return None;
+    }
+  }
+}
+
+fn get_config_from_file(file: &PathBuf) -> Option<Config> {
+  let contents = match fs::read_to_string(file) {
+    Ok(contents) => contents,
+    Err(_) => return None,
+  };
+  match serde_json::from_str(&contents) {
     Ok(config) => Some(config),
     Err(_) => None,
-  };
+  }
 }

@@ -1,22 +1,28 @@
-use clap::Command;
+use crate::commands::Commands;
+use clap::Parser;
+use debug_print::debug_println;
 
-mod app_error;
 mod commands;
 mod config;
+mod constants;
+mod error;
+mod utils;
+
+#[derive(Parser, Debug)]
+#[command(name = "shadow", author, version)]
+#[command(about = "A simple tool to manage the akashi shadow records")]
+#[command(arg_required_else_help = true)]
+#[command(subcommand_required = true)]
+struct Cli {
+  #[command(subcommand)]
+  cmd: Commands,
+}
 
 fn main() {
-  let init_command = commands::init::get_command();
+  let cli = Cli::parse();
+  debug_println!("cli: {:?}", cli);
 
-  let matches = Command::new("shadow")
-    .version("0.1.0")
-    .about("A simple tool to manage the akashi shadow records")
-    .subcommand_required(true)
-    .arg_required_else_help(true)
-    .subcommand(init_command)
-    .get_matches();
-
-  match matches.subcommand() {
-    Some(("init", args)) => commands::init::run(args),
-    _ => unreachable!(),
-  };
+  match &cli.cmd {
+    Commands::Init(args) => commands::init::execute(args),
+  }
 }

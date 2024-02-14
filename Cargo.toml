@@ -8,8 +8,10 @@ description = "A simple CLI tool to manage the akashi shadow records"
 
 [dependencies]
 clap = { version = "4.5.0", features = ["derive"] }
-inquire = "0.6.2"
+debug_print = "1.0.0"
+inquire = { version = "0.6.2", features = ["editor"] }
 lazy_static = "1.4.0"
 magic-crypt = "3.1.13"
+rmp-serde = "1.1.2"
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
